@@ -1,0 +1,13 @@
+
+dotenv: .env
+wallets:
+  benno: ${PK1}
+  fernando: ${PK2}
+  hosp_1: ${PK3}
+  hosp_2: ${PK4}
+
+networks:
+  default: private
+
+
+
