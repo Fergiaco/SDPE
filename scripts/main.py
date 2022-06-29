@@ -25,14 +25,14 @@ def removePermissao(p,h):
     p.removeCombinacao(h)
 
 def visualizacaoHospital(p,h):
-    #remove permissao 
+    #hosp tenta acessar prontuarios do paciente
     h.get(p.nome)
     
     
 def main():
     h1=hospital('hosp_1')
     h2=hospital('hosp_2')
-    p1=paciente('benno')
+    p1=paciente('paciente')
     p2=paciente('fernando')
     
     passoInicial(p1,h1)

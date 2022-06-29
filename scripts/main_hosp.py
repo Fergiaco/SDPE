@@ -1,0 +1,1 @@
+from scripts.hospital import hospital

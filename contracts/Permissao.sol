@@ -7,13 +7,13 @@ pragma solidity >=0.7.0 <0.9.0;
  * @dev Store & retrieve value in a variable
  */
 contract Permissao{
-    address private owner;
+    address private _owner;
 
     //combinacao de chaves para cid
     mapping(string => string[]) public cids;
 
-    constructor(address _paciente) {
-        owner = _paciente;
+    constructor() {
+        _owner = msg.sender;
     }
 
     error Unauthorized();
@@ -29,16 +29,16 @@ contract Permissao{
         _;
     }
 
-    function getPronts(string memory _combinacao) onlyBy(owner) public view returns(string[] memory) {
+    function getPronts(string memory _combinacao) onlyBy(_owner) public view returns(string[] memory) {
         return cids[_combinacao];
     }
 
-    function addPront(string memory _combinacao,string memory _cid) onlyBy(owner) public {
+    function addPront(string memory _combinacao,string memory _cid) onlyBy(_owner) public {
         cids[_combinacao].push(_cid);
     
     }
 
-    function removePront(string memory _combinacao,string memory _cid) onlyBy(owner) public {
+    function removePront(string memory _combinacao,string memory _cid) onlyBy(_owner) public {
         require(cids[_combinacao].length>0,
             "Esse Hospital nao tem permissao");
         

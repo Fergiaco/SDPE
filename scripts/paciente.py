@@ -8,32 +8,36 @@ import Crypto.Cipher.PKCS1_OAEP as PKCS1
 class paciente:
     def __init__(self,nome):
         self.nome=nome
+        self.conta=get_account(nome)
         self.contratos=()
+
         #Gera chave RSA
         key=self.importKey()
         self.publickey = key.publickey()
 
-
-    def addMember(self,hosp):
-        account=get_account(self.nome)
+    def addMember(self,nome_hosp):
         contrato=get_contract(self.contratos[0],Paciente)
         try:
-            contrato.addMember(hosp,{"from": account})
-            print(hosp,'pode adicionar prontuarios para',self.nome)
+            print('conta',self.conta)
+            hosp=self.getHosp(nome_hosp)
+            contrato.addMember(hosp[0],{"from": self.conta})
+            print(nome_hosp,hosp[0],'pode adicionar prontuarios para',self.nome)
         except:
-            print(hosp,"já tem permissao para adicionar em",self.nome)
+            print(nome_hosp,hosp[0],"já tem permissao para adicionar em",self.nome)
 
-    def removeMember(self,hosp):
-        account=get_account(self.nome)
+    def removeMember(self,nome_hosp):
+        #account=get_account(self.nome)
         contrato=get_contract(self.contratos[0],Paciente)
-        contrato.removeMember(get_account(hosp),{"from": account})
-        print(hosp,'não pode mais adicionar prontuarios para',self.nome)
+        hosp=self.getHosp(nome_hosp)
+        contrato.removeMember(hosp[0],{"from": self.conta})
+        print(nome_hosp,hosp[0],'não pode mais adicionar prontuarios para',self.nome)
 
     #Retorna a lista de chaves dos Prontuarios 
     def get(self):
-        account=get_account(self.nome)
+        #account=get_account(self.nome)
         contrato=get_contract(self.contratos[0],Paciente)
-        r=contrato.get({"from": account})
+        r=contrato.get({"from": self.conta})
+        
         for x in range(len(r)):
             print(x,' - ',r[x][0])
         return r
@@ -41,6 +45,7 @@ class paciente:
     #printa o Prontuario escolhido
     def get_pront(self):
         r=self.get() 
+        print(r)
         info=r[0][0]
         cid=r[0][1]
         encrypted=ipfs.cat(cid)
@@ -67,18 +72,20 @@ class paciente:
 
         else:print('Nenhum prontuario salvo\n')
 
-    def addCombinacao(self,hosp):
+    def addCombinacao(self,nome_hosp):
         print("\n===================================================")
-        print('Escolha o dado que deseja compartilhar com ',hosp.nome)
+        print('Escolha o dado que deseja compartilhar com ',nome_hosp)
         r=self.get_pront()
         info=r[0]
-        encryptor = PKCS1.new(hosp.publickey)
-        encrypted=encryptor.encrypt(r[1])
+        hosp=self.getHosp(nome_hosp)
+        #pegar public do arquivo
+        #encryptor = PKCS1.new()
+        #encrypted=encryptor.encrypt(r[1])
+        
         path='./dados/paciente/'+info
-        file=open(path,'wb')
-        file.write(encrypted)
-        file.close()
-
+        #with open(path,'wb') as file:
+        #    file.write(encrypted)
+        
         cid=ipfs.add(path)
         os.remove(path)
         cid=info+','+cid
@@ -96,7 +103,6 @@ class paciente:
         contrato.addPront(combinado,cid,{"from": account})
         print('Permissao adicionada para',hosp.nome,' - ',info)
         
-
     def removeCombinacao(self,hosp):
         account=get_account(self.nome)
         contrato=get_contract(self.contratos[1],Permissao)
@@ -135,4 +141,74 @@ class paciente:
             file.write((k))
             print('chave criada ',self.nome)
             return key
+
+    def cria_ficha(self):
+        conta=get_account(self.nome)
+        if self.contratos!=(): 
+            print('\n===========Já tem uma ficha===========')
+            #return self.contratos[0],self.contratos[1]
+        else:
+            print('\n=========== Criando ficha ===========')
+            contrato1=Paciente.deploy({"from": conta})
+            contrato2=Permissao.deploy({"from": conta})
+            print('\n=========== Ficha criada ===========')
+            self.contratos=[contrato1,contrato2,[]]
+            with open('./dados/contratos/'+self.nome+'.txt','w+') as file:
+                file.write(self.contratos[0].address+';'+self.contratos[1].address+';'+str(self.contratos[2]))
+            self.atualiza_banco()
+            #print(self.contratos)
+
+    #SC3 -> banco de dados de contas
+    def passoInicial(self,nome):
+        h=self.getHosp(nome)
+        if h:
+            print(h)
             
+        else:
+            print(nome,'não foi cadastrado')
+        #p.contratos=h.cria_ficha(p.nome)
+
+    #pega conta e pk do hospital pelo nome
+    def getHosp(self,nome_hosp):
+        with open('dados/hospitais.txt','r') as file:
+            for hosp in file:
+                h=hosp.split(';')
+                if h[0]==nome_hosp:
+                    return (h[1] ,h[2].replace('\n',''))
+        return False
+
+    def get_contratos(self):
+        try:
+            with open('./dados/contratos/'+self.nome+'.txt','r') as file:
+                f=file.readline().split(';')
+                aux=[]
+                for x in f[2].split(','):
+                    aux.append(x)
+                self.contratos=[get_contract(f[0],Paciente),get_contract(f[1],Permissao),aux]
+                print('=============Contratos já criados=============')  
+        except:
+            self.cria_ficha()
+            self.atualiza_banco()  
+            
+    def atualiza_banco(self):
+        with open('dados/pacientes.txt','r') as file:
+            for paciente in file:
+                p=paciente.split(';')
+                if p[0]==self.nome:
+                    return False
+
+        with open('dados/pacientes.txt','a') as file:
+            print('escrevendo dados ')
+            file.write('\n'+self.nome+';'+str(self.conta)+';'+str(self.publickey.export_key('DER')))
+        
+
+#p=paciente('benno',0xc0bcafde29595c4013f5b6e0b70b5e28f8f357c4fab80707279cabf75e508ee5)
+
+p=paciente('benno')
+#p.atualiza_banco()
+
+for i in range(1):
+    p.get_contratos()
+    p.addMember('hospital_1')
+    #p.removeMember('hospital_1')
+    #p.addCombinacao('hospital_1')

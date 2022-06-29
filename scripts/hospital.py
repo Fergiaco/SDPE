@@ -1,29 +1,26 @@
-import Crypto.Cipher.PKCS1_OAEP as PKCS1
 from brownie import Paciente,Permissao
 from scripts.help import get_account,get_contract
 import scripts.ipfs as ipfs
-from scripts.paciente import paciente
-import scripts.ipfs as ipfs
 import random
-from Crypto import Random
 from Crypto.Cipher import AES
+from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
-import base64
 import os
 
 class hospital:
     def __init__(self,nome):
-        try:
-            os.mkdir('./dados/hosp/'+nome)
-        except:
-            pass
+        #try:
+        #    os.mkdir('./dados/hosp/'+nome)
+        #except:
+        #    pass
 
         self.nome=nome
-        self.pacientes=self.importaPacientes()
+        self.conta=get_account(nome)
         key=self.importKey()
         self.publickey = key.publickey()
+        #print(self.publickey)
         
-    #Hospital cria ficha para o paciente
+    """ #Hospital cria ficha para o paciente
     def cria_ficha(self,paciente):
         p=get_account(paciente)
         if p in self.pacientes: 
@@ -37,16 +34,13 @@ class hospital:
             print('\n=========== Ficha criada para o paciente ',paciente,'===========')
             self.pacientes[p]=[contrato1,contrato2,[]]
             self.salvaPacientes()
-            return (contrato1,contrato2)
+            return (contrato1,contrato2) """
 
     def geraPront(self,paciente):
         data=str(random.randint(1,28))+'-'+str(random.randint(1,12))+'-'+str(random.randint(1920,2021))
         dados=paciente+'-'+data+'-'+self.nome
 
-        path='./dados/hosp/'+self.nome+'/'+dados+'.txt'
-        print(path)
-
-        
+        path='./dados/prontuarios/'+dados+'.txt'
         pront=open(path,'w')
         modelo=open('./dados/modelo.txt')
         for linha in modelo:
@@ -54,10 +48,10 @@ class hospital:
 
             if 'Patient Id' in linha:
                 linha+=paciente
-                print(linha)
+                #print(linha)
             elif 'Date' in linha:
                 linha+=data
-                print(linha)
+                #print(linha)
             elif 'Hospital Id' in linha:
                 linha+=self.nome
 
@@ -66,41 +60,43 @@ class hospital:
         return(path,dados)
             
     #Hospital adiciona prontuario para contrato paciente se tiver permissao
-    def add_prontuario(self,paciente):
-        account=get_account(self.nome)
-        p=get_account(paciente.nome)
-
-        prontuario=self.geraPront(paciente.nome)
+    def add_prontuario(self,nome_paciente):
+        paciente=self.get_pacientes(nome_paciente)
+        prontuario=self.geraPront(nome_paciente)
         path=prontuario[0]
         dados=prontuario[1]
 
-        file=open(path,'rb')
-        encryptor=PKCS1.new(paciente.publickey)
-        encrypted=encryptor.encrypt(file.read())
+        #chave
+        #print(paciente[1])
         
-        ##Criptografa Prontuario com paciente.publickey
-        file=open(path,'wb')
-        file.write(encrypted)
-        file.close()
-
+        ###Criptografa Prontuario com paciente.publickey
+        #with open(path,'rb') as file:
+        #    #encryptor=PKCS1_OAEP.new(paciente[1])
+        #    encryptor=PKCS1_OAEP.new(RSA.importKey(paciente[1]))
+        #    f=file.read()
+        #    print(f)
+        #    encrypted=encryptor.encrypt(f)
+        #print(encrypted)
+        #with open(path,'wb') as file:
+        #    file.write(encrypted)
+        
         #Envia pro ipfs
         cid=ipfs.add(path)
         os.remove(path)
-
-        if p not in self.pacientes:
-            print(paciente.nome,'Não ainda não tem uma ficha no',self.nome)
-        elif dados not in self.pacientes[p][2]:
+        paciente=self.get_pacientes(nome_paciente)
+        if paciente:
             try:
-                contrato=get_contract(self.pacientes[p][0],Paciente)
-                contrato.add(dados,cid,{"from": account})
+                contrato=get_contract(paciente[0],Paciente)
+                contrato.add(dados,cid,{"from": self.conta})
                 print('\n=========== Prontuario adicionado ',dados,'===========')
-                self.pacientes[p][2].append(dados)
-                self.salvaPacientes()
+                #self.pacientes[p][2].append(dados)
+                #self.salvaPacientes()
                 #return contrato
             except:
-                print('\nO hospital não tem permissão para adicionar esse prontuário')
+                print('\nO hospital não tem permissão para adicionar esse prontuário')    
         else:
-            print(self.nome,'já adicionou esse prontuário para',paciente.nome)
+            print(nome_paciente,'Não ainda não tem uma ficha')
+            #print(self.nome,'já adicionou esse prontuário para',paciente.nome)
 
     def get(self,paciente):
         account=get_account(self.nome)
@@ -123,17 +119,47 @@ class hospital:
             
             dado=r[escolha].split(',')
             cid=dado[1]
-            encrypted=ipfs.cat(cid)
-            decryptor = PKCS1.new(self.importKey())
-            decrypted = decryptor.decrypt(encrypted)
+            pront=ipfs.cat(cid)
             print('Vizualizando Prontuario -',dado[0])
-            print(decrypted.decode('utf-8'))
+            print(pront)
+
+            #Descripto
+            #encrypted=ipfs.cat(cid)
+            #decryptor = PKCS1.new(self.importKey())
+            #decrypted = decryptor.decrypt(encrypted)
+            #print('Vizualizando Prontuario -',dado[0])
+            #print(decrypted.decode('utf-8'))
 
         except:
             print(self.nome,'Não tem Permissão para acessar dados do paciente',paciente,' \n')
         return r
 
-    def importaDados(self,hosp):
+    def importKey(self):
+        try:
+            file=open('./dados/hosp/'+self.nome+'/key','rb')
+            k=file.read()
+            k=RSA.import_key(k)
+            #print('chave importada ',self.nome)
+            return k
+    
+        except:
+            file=open('./dados/hosp/'+self.nome+'/key','wb')
+            key=RSA.generate(2048)
+            k=key.exportKey('DER')
+            file.write(k)
+            #file.close()
+            print('chave criada ',self.nome)
+            return key
+
+    def get_pacientes(self,nome_paci):
+        with open('dados/pacientes.txt','r') as file:
+            for hosp in file:
+                h=hosp.split(';')
+                if h[0]==nome_paci:
+                    return (h[1] ,h[2].replace('\n',''))
+        return False
+
+    """     def importaDados(self,hosp):
         print("\n===================================================")
         print(self.nome,"- importando dados de ",hosp.nome)
         file=open('./dados/hosp/'+hosp.nome+'/infos.txt','r')
@@ -164,24 +190,8 @@ class hospital:
             s=str(paciente)+'; '+str(self.pacientes[paciente][0])+'; '+str(self.pacientes[paciente][1])+'; '+dados[:-1]+'; \n'
             file.write(s)
         file.close()
+    """
 
-    def importKey(self):
-        try:
-            file=open('./dados/hosp/'+self.nome+'/key','rb')
-            k=file.read()
-            k=RSA.import_key(k)
-            #print('chave importada ',self.nome)
-            return k
-    
-        except:
-            file=open('./dados/hosp/'+self.nome+'/key','wb')
-            key=RSA.generate(2048)
-            k=key.exportKey('DER')
-            file.write(k)
-            #file.close()
-            print('chave criada ',self.nome)
-            return key
-            
 #def encrypt(raw,key):
 #    raw=pad(raw)
 #    iv = Random.new().read(AES.block_size)
@@ -191,3 +201,6 @@ class hospital:
 def pad(s):
     bs=AES.block_size
     return s + (bs - len(s) % bs) * chr(bs - len(s) % bs)
+
+h=hospital('hospital_1')
+h.add_prontuario('benno')
