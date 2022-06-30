@@ -44,14 +44,6 @@ class paciente:
 
     #printa o Prontuario escolhido
     def get_pront(self):
-        r=self.get() 
-        print(r)
-        info=r[0][0]
-        cid=r[0][1]
-        encrypted=ipfs.cat(cid)
-        decryptor = PKCS1.new(self.importKey())
-        decrypted = decryptor.decrypt(encrypted)
-
         print("\n---------------------------------------------------")
         print('Dados do Paciente',self.nome)
         r=self.get()
@@ -61,15 +53,8 @@ class paciente:
                 x=int(input('Digite um valor valido\n'))
             info=r[x][0]
             cid=r[x][1]
-            encrypted=ipfs.cat(cid)
-            decryptor = PKCS1.new(self.importKey())
-            decrypted = decryptor.decrypt(encrypted)
-
-            #printa prontuario formatado
-            #print(decrypted.decode('utf-8').replace('\n',''))
-            #retorna desformatado
-            return info,decrypted
-
+            arquivo=ipfs.cat(cid)
+            return info,arquivo
         else:print('Nenhum prontuario salvo\n')
 
     def addCombinacao(self,nome_hosp):
@@ -83,25 +68,25 @@ class paciente:
         #encrypted=encryptor.encrypt(r[1])
         
         path='./dados/paciente/'+info
-        #with open(path,'wb') as file:
-        #    file.write(encrypted)
+        with open(path,'wb') as file:
+            file.write(r[1])
         
         cid=ipfs.add(path)
         os.remove(path)
         cid=info+','+cid
 
         account=get_account(self.nome)
-        combinado=str(get_account(hosp.nome))+str(account)
+        combinado=str(hosp[0])+str(account)
         contrato=get_contract(self.contratos[1],Permissao)
         perms=contrato.getPronts(combinado,{"from": account})
         
         for perm in perms:
             if info in perm:
-                print(hosp.nome,'Já tem permissao de acesso para',info)
+                print(nome_hosp,'Já tem permissao de acesso para',info)
                 return False
         
         contrato.addPront(combinado,cid,{"from": account})
-        print('Permissao adicionada para',hosp.nome,' - ',info)
+        print('Permissao adicionada para',nome_hosp,' - ',info)
         
     def removeCombinacao(self,hosp):
         account=get_account(self.nome)
@@ -156,14 +141,12 @@ class paciente:
             with open('./dados/contratos/'+self.nome+'.txt','w+') as file:
                 file.write(self.contratos[0].address+';'+self.contratos[1].address+';'+str(self.contratos[2]))
             self.atualiza_banco()
-            #print(self.contratos)
 
     #SC3 -> banco de dados de contas
     def passoInicial(self,nome):
         h=self.getHosp(nome)
         if h:
             print(h)
-            
         else:
             print(nome,'não foi cadastrado')
         #p.contratos=h.cria_ficha(p.nome)
@@ -209,6 +192,6 @@ p=paciente('benno')
 
 for i in range(1):
     p.get_contratos()
-    p.addMember('hospital_1')
+    #p.addMember('hospital_1')
     #p.removeMember('hospital_1')
-    #p.addCombinacao('hospital_1')
+    p.addCombinacao('hospital_1')

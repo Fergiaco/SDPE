@@ -13,8 +13,8 @@ def get_contract(address,nome):
     print('Contrato não existe')
 
 def get_account(conta):
-    return accounts.add(config["wallets"][conta])
-    
+    return accounts.add(config["wallets"][conta]) 
+
 def encrypt(raw,key):
     raw=pad(raw)
     iv = Random.new().read(AES.block_size)
@@ -33,6 +33,5 @@ def decrypt(enc,key):
     iv = enc[:AES.block_size]
     cipher = AES.new(key, AES.MODE_CBC, iv)
     return unpad(cipher.decrypt(enc[AES.block_size:])).decode('utf-8')
-    
 
 

@@ -86,25 +86,23 @@ class hospital:
         paciente=self.get_pacientes(nome_paciente)
         if paciente:
             try:
-                contrato=get_contract(paciente[0],Paciente)
+                c=self.importaContratosPaciente(nome_paciente)
+                contrato=get_contract(c[0],Paciente)
                 contrato.add(dados,cid,{"from": self.conta})
                 print('\n=========== Prontuario adicionado ',dados,'===========')
-                #self.pacientes[p][2].append(dados)
-                #self.salvaPacientes()
-                #return contrato
             except:
                 print('\nO hospital não tem permissão para adicionar esse prontuário')    
         else:
             print(nome_paciente,'Não ainda não tem uma ficha')
-            #print(self.nome,'já adicionou esse prontuário para',paciente.nome)
 
-    def get(self,paciente):
+    def get(self,nome_paciente):
         account=get_account(self.nome)
-        p=get_account(paciente)
+        p=get_account(nome_paciente)
         print("\n---------------------------------------------------")
-        print('Cids Disponibilizados pelo Paciente ',paciente,'para o',self.nome,'\n')
+        print('Cids Disponibilizados pelo Paciente ',nome_paciente,'para o',self.nome,'\n')
         combinado=str(account)+str(p)
-        contrato=get_contract(self.pacientes[p][1],Permissao)
+        c=self.importaContratosPaciente(nome_paciente)
+        contrato=get_contract(c[1],Permissao)
         try:
             r=contrato.get(combinado,{"from": account})
             if len(r)==0:
@@ -131,7 +129,7 @@ class hospital:
             #print(decrypted.decode('utf-8'))
 
         except:
-            print(self.nome,'Não tem Permissão para acessar dados do paciente',paciente,' \n')
+            print(self.nome,'Não tem Permissão para acessar dados do paciente',nome_paciente,' \n')
         return r
 
     def importKey(self):
@@ -159,6 +157,17 @@ class hospital:
                     return (h[1] ,h[2].replace('\n',''))
         return False
 
+    def importaContratosPaciente(self,nome_paciente):
+        try:
+            with open('./dados/contratos/'+nome_paciente+'.txt','r') as file:
+                f=file.readline().split(';')
+                aux=[]
+                for x in f[2].split(','):
+                    aux.append(x)
+                return (f[0],f[1],aux)
+        except:
+            print('=============Paciente não tem contratos=============') 
+    
     """     def importaDados(self,hosp):
         print("\n===================================================")
         print(self.nome,"- importando dados de ",hosp.nome)
@@ -168,18 +177,6 @@ class hospital:
             self.pacientes[l[0]]=[l[1],l[2],l[3].split(',')]
         self.salvaPacientes()
         
-    def importaPacientes(self):
-        try:
-            file=open('./dados/hosp/'+self.nome+'/infos.txt','x')
-        except:
-            pass
-
-        pacientes={}
-        file=open('./dados/hosp/'+self.nome+'/infos.txt','r')
-        for linha in file:
-            l=linha.split('; ')
-            pacientes[l[0]]=[l[1],l[2],l[3].split(',')]
-        return pacientes
 
     def salvaPacientes(self):
         file=open('./dados/hosp/'+self.nome+'/infos.txt','w')
@@ -204,3 +201,4 @@ def pad(s):
 
 h=hospital('hospital_1')
 h.add_prontuario('benno')
+h.get('benno')
